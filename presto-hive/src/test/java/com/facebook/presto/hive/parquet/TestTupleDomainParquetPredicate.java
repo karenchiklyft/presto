@@ -21,7 +21,6 @@ import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.type.VarcharType;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
-import org.jetbrains.annotations.NotNull;
 import org.testng.annotations.Test;
 import parquet.column.ColumnDescriptor;
 import parquet.column.statistics.BinaryStatistics;
@@ -189,12 +188,14 @@ public class TestTupleDomainParquetPredicate
             throws Exception
     {
         RichColumnDescriptor tableColumn = getTableColumn();
+        String value = "Test";
         TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn,
-                VarcharType.createVarcharType(255));
+                VarcharType.createVarcharType(255), value);
         List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
         Statistics stats = BinaryStatistics.getStatsBasedOnType(tableColumn.getType());
         stats.setNumNulls(1L);
+        stats.setMinMaxFromBytes(value.getBytes(), value.getBytes());
         assertTrue(predicate.matches(2, Collections.singletonMap(tableColumn, stats)));
     }
 
@@ -203,9 +204,10 @@ public class TestTupleDomainParquetPredicate
             throws Exception
     {
         RichColumnDescriptor tableColumn = getTableColumn();
-        Slice slice = Slices.utf8Slice("Test");
+        String value = "Test";
+        Slice slice = Slices.utf8Slice(value);
         TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn,
-                VarcharType.createVarcharType(255));
+                VarcharType.createVarcharType(255), value);
         List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
         ParquetDictionaryPage page = new ParquetDictionaryPage(slice, 2, ParquetEncoding.PLAIN_DICTIONARY);
@@ -213,14 +215,13 @@ public class TestTupleDomainParquetPredicate
                 new ParquetDictionaryDescriptor(tableColumn, Optional.of(page)))));
     }
 
-    @NotNull
     private TupleDomain<ColumnDescriptor> getEffectivePredicate(RichColumnDescriptor tableColumn,
-                                                                com.facebook.presto.spi.type.Type type)
+                                                                VarcharType type, String value)
     {
         ColumnDescriptor predicateColumn = new ColumnDescriptor(tableColumn.getPath(),
                 tableColumn.getType(), 0, 0);
 
-        Slice slice = Slices.utf8Slice("Test");
+        Slice slice = Slices.utf8Slice(value);
         Domain predicateDomain = Domain.singleValue(type, slice);
         Map<ColumnDescriptor, Domain> predicateColumns = Collections.singletonMap(predicateColumn,
                 predicateDomain);
@@ -228,7 +229,6 @@ public class TestTupleDomainParquetPredicate
         return TupleDomain.withColumnDomains(predicateColumns);
     }
 
-    @NotNull
     private RichColumnDescriptor getTableColumn()
     {
         PrimitiveType.PrimitiveTypeName typeName = PrimitiveType.PrimitiveTypeName.BINARY;
