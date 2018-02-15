@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.parquet;
 
+import com.facebook.presto.hive.parquet.predicate.ParquetDictionaryDescriptor;
 import com.facebook.presto.hive.parquet.predicate.TupleDomainParquetPredicate;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -20,6 +21,7 @@ import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.type.VarcharType;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import org.jetbrains.annotations.NotNull;
 import org.testng.annotations.Test;
 import parquet.column.ColumnDescriptor;
 import parquet.column.statistics.BinaryStatistics;
@@ -35,6 +37,7 @@ import parquet.schema.Type;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.facebook.presto.hive.parquet.predicate.TupleDomainParquetPredicate.getDomain;
 import static com.facebook.presto.spi.predicate.Domain.all;
@@ -185,24 +188,48 @@ public class TestTupleDomainParquetPredicate
     public void testMatchesWithStatistics()
             throws Exception
     {
-        PrimitiveType.PrimitiveTypeName typeName = PrimitiveType.PrimitiveTypeName.BINARY;
-        PrimitiveType type = new PrimitiveType(Type.Repetition.OPTIONAL, typeName, "Test column");
-        String[] paths = {"path"};
+        RichColumnDescriptor tableColumn = getTableColumn();
+        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn);
+        List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
+        TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
+        Statistics stats = BinaryStatistics.getStatsBasedOnType(tableColumn.getType());
+        stats.setNumNulls(1L);
+        assertTrue(predicate.matches(2, Collections.singletonMap(tableColumn, stats)));
+    }
 
-        ColumnDescriptor predicateColumn = new ColumnDescriptor(paths, typeName, 0, 0);
-        RichColumnDescriptor tableColumn = new RichColumnDescriptor(paths, type, 0, 0);
+    @Test
+    public void testMatchesWithDescriptors()
+            throws Exception
+    {
+        RichColumnDescriptor tableColumn = getTableColumn();
+        Slice slice = Slices.utf8Slice("Test");
+        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn);
+        List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
+        TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
+        ParquetDictionaryPage page = new ParquetDictionaryPage(slice, 2, ParquetEncoding.PLAIN_DICTIONARY);
+        assertTrue(predicate.matches(Collections.singletonMap(tableColumn, new ParquetDictionaryDescriptor(tableColumn, Optional.of(page)))));
+    }
+
+    @NotNull
+    private TupleDomain<ColumnDescriptor> getEffectivePredicate(RichColumnDescriptor tableColumn)
+    {
+        ColumnDescriptor predicateColumn = new ColumnDescriptor(tableColumn.getPath(), tableColumn.getType(), 0, 0);
 
         Slice slice = Slices.utf8Slice("Test");
         Domain predicateDomain = Domain.singleValue(VarcharType.createVarcharType(255), slice);
         Map<ColumnDescriptor, Domain> predicateColumns = Collections.singletonMap(predicateColumn,
                 predicateDomain);
 
-        TupleDomain<ColumnDescriptor> effectivePredicate = TupleDomain.withColumnDomains(predicateColumns);
-        List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
-        TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
-        Statistics stats = BinaryStatistics.getStatsBasedOnType(typeName);
-        stats.setNumNulls(1L);
-        assertTrue(predicate.matches(2, Collections.singletonMap(tableColumn, stats)));
+        return TupleDomain.withColumnDomains(predicateColumns);
+    }
+
+    @NotNull
+    private RichColumnDescriptor getTableColumn()
+    {
+        PrimitiveType.PrimitiveTypeName typeName = PrimitiveType.PrimitiveTypeName.BINARY;
+        PrimitiveType type = new PrimitiveType(Type.Repetition.OPTIONAL, typeName, "Test column");
+        String[] paths = {"path"};
+        return new RichColumnDescriptor(paths, type, 0, 0);
     }
 
     private static FloatStatistics floatColumnStats(float minimum, float maximum)
