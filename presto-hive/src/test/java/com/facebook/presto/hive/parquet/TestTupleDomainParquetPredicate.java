@@ -189,7 +189,8 @@ public class TestTupleDomainParquetPredicate
             throws Exception
     {
         RichColumnDescriptor tableColumn = getTableColumn();
-        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn);
+        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn,
+                VarcharType.createVarcharType(255));
         List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
         Statistics stats = BinaryStatistics.getStatsBasedOnType(tableColumn.getType());
@@ -203,20 +204,24 @@ public class TestTupleDomainParquetPredicate
     {
         RichColumnDescriptor tableColumn = getTableColumn();
         Slice slice = Slices.utf8Slice("Test");
-        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn);
+        TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn,
+                VarcharType.createVarcharType(255));
         List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
         ParquetDictionaryPage page = new ParquetDictionaryPage(slice, 2, ParquetEncoding.PLAIN_DICTIONARY);
-        assertTrue(predicate.matches(Collections.singletonMap(tableColumn, new ParquetDictionaryDescriptor(tableColumn, Optional.of(page)))));
+        assertTrue(predicate.matches(Collections.singletonMap(tableColumn,
+                new ParquetDictionaryDescriptor(tableColumn, Optional.of(page)))));
     }
 
     @NotNull
-    private TupleDomain<ColumnDescriptor> getEffectivePredicate(RichColumnDescriptor tableColumn)
+    private TupleDomain<ColumnDescriptor> getEffectivePredicate(RichColumnDescriptor tableColumn,
+                                                                com.facebook.presto.spi.type.Type type)
     {
-        ColumnDescriptor predicateColumn = new ColumnDescriptor(tableColumn.getPath(), tableColumn.getType(), 0, 0);
+        ColumnDescriptor predicateColumn = new ColumnDescriptor(tableColumn.getPath(),
+                tableColumn.getType(), 0, 0);
 
         Slice slice = Slices.utf8Slice("Test");
-        Domain predicateDomain = Domain.singleValue(VarcharType.createVarcharType(255), slice);
+        Domain predicateDomain = Domain.singleValue(type, slice);
         Map<ColumnDescriptor, Domain> predicateColumns = Collections.singletonMap(predicateColumn,
                 predicateDomain);
 
