@@ -13,14 +13,28 @@
  */
 package com.facebook.presto.hive.parquet;
 
+import com.facebook.presto.hive.parquet.predicate.TupleDomainParquetPredicate;
+import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
+import com.facebook.presto.spi.type.VarcharType;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import org.testng.annotations.Test;
+import parquet.column.ColumnDescriptor;
 import parquet.column.statistics.BinaryStatistics;
 import parquet.column.statistics.BooleanStatistics;
 import parquet.column.statistics.DoubleStatistics;
 import parquet.column.statistics.FloatStatistics;
 import parquet.column.statistics.LongStatistics;
+import parquet.column.statistics.Statistics;
 import parquet.io.api.Binary;
+import parquet.schema.PrimitiveType;
+import parquet.schema.Type;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static com.facebook.presto.hive.parquet.predicate.TupleDomainParquetPredicate.getDomain;
 import static com.facebook.presto.spi.predicate.Domain.all;
@@ -39,6 +53,7 @@ import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharTyp
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Float.floatToRawIntBits;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TestTupleDomainParquetPredicate
 {
@@ -164,6 +179,30 @@ public class TestTupleDomainParquetPredicate
                 create(ValueSet.ofRanges(range(REAL, (long) floatToRawIntBits(minimum), true, (long) floatToRawIntBits(maximum), true)), false));
 
         assertEquals(getDomain(REAL, 10, floatColumnStats(maximum, minimum)), create(ValueSet.all(REAL), false));
+    }
+
+    @Test
+    public void testMatchesWithStatistics()
+            throws Exception
+    {
+        PrimitiveType.PrimitiveTypeName typeName = PrimitiveType.PrimitiveTypeName.BINARY;
+        PrimitiveType type = new PrimitiveType(Type.Repetition.OPTIONAL, typeName, "Test column");
+        String[] paths = {"path"};
+
+        ColumnDescriptor predicateColumn = new ColumnDescriptor(paths, typeName, 0, 0);
+        RichColumnDescriptor tableColumn = new RichColumnDescriptor(paths, type, 0, 0);
+
+        Slice slice = Slices.utf8Slice("Test");
+        Domain predicateDomain = Domain.singleValue(VarcharType.createVarcharType(255), slice);
+        Map<ColumnDescriptor, Domain> predicateColumns = Collections.singletonMap(predicateColumn,
+                predicateDomain);
+
+        TupleDomain<ColumnDescriptor> effectivePredicate = TupleDomain.withColumnDomains(predicateColumns);
+        List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
+        TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
+        Statistics stats = BinaryStatistics.getStatsBasedOnType(typeName);
+        stats.setNumNulls(1L);
+        assertTrue(predicate.matches(2, Collections.singletonMap(tableColumn, stats)));
     }
 
     private static FloatStatistics floatColumnStats(float minimum, float maximum)

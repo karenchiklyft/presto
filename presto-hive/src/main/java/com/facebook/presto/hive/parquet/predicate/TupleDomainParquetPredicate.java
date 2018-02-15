@@ -110,11 +110,12 @@ public class TupleDomainParquetPredicate
         return effectivePredicate.overlaps(stripeDomain);
     }
 
-    private Type getType(RichColumnDescriptor column) {
+    private Type getType(RichColumnDescriptor column)
+    {
         Optional<Map<ColumnDescriptor, Domain>> predicateDomains = effectivePredicate.getDomains();
-        if(predicateDomains.isPresent()) {
+        if (predicateDomains.isPresent()) {
             Domain domain = predicateDomains.get().get(column);
-            if(domain != null) {
+            if (domain != null) {
                 return domain.getType();
             }
         }
