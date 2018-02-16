@@ -204,10 +204,10 @@ public class TestTupleDomainParquetPredicate
             throws Exception
     {
         RichColumnDescriptor tableColumn = getTableColumn();
-        String value = "Test";
-        Slice slice = Slices.utf8Slice(value);
+        String val = "Test";
+        Slice slice = Slices.utf8Slice(val);
         TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(tableColumn,
-                VarcharType.createVarcharType(255), value);
+                VarcharType.createVarcharType(255), val);
         List<RichColumnDescriptor> tableColumns = Collections.singletonList(tableColumn);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, tableColumns);
         ParquetDictionaryPage page = new ParquetDictionaryPage(slice, 2, ParquetEncoding.PLAIN_DICTIONARY);
