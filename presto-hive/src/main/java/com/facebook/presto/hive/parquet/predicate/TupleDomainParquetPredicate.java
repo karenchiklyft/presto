@@ -90,6 +90,7 @@ public class TupleDomainParquetPredicate
             domains.put(column, domain);
         }
         TupleDomain<ColumnDescriptor> stripeDomain = TupleDomain.withColumnDomains(domains.build());
+
         return effectivePredicate.overlaps(stripeDomain);
     }
 
@@ -112,6 +113,9 @@ public class TupleDomainParquetPredicate
 
     private Type getType(RichColumnDescriptor column)
     {
+        // we look at effective predicate domain because it more accurately matches the hive column
+        // than the type available in the parquet metadata passed here as RichColumnDescriptor
+        // for example varchar(len) hive column is translated to binary and then to varchar type using parquet metadata
         Optional<Map<ColumnDescriptor, Domain>> predicateDomains = effectivePredicate.getDomains();
         if (predicateDomains.isPresent()) {
             Domain domain = predicateDomains.get().get(column);
