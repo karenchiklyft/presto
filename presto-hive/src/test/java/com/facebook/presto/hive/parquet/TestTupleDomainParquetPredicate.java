@@ -204,7 +204,7 @@ public class TestTupleDomainParquetPredicate
     public void testMatchesWithDescriptors()
     {
         RichColumnDescriptor column = getColumn();
-        String value = "Test";
+        String value = "Test2";
         TupleDomain<ColumnDescriptor> effectivePredicate = getEffectivePredicate(column, createVarcharType(255), value);
         List<RichColumnDescriptor> columns = singletonList(column);
         TupleDomainParquetPredicate predicate = new TupleDomainParquetPredicate(effectivePredicate, columns);
